@@ -11,6 +11,9 @@ import errno
 import random
 import string
 
+# Added libraries
+from Crypto.Cipher import AES
+
 class SmartNetworkThermometer (threading.Thread) :
     open_cmds = ["AUTH", "LOGOUT"]
     prot_cmds = ["SET_DEGF", "SET_DEGC", "SET_DEGK", "GET_TEMP", "UPDATE_TEMP"]
@@ -29,6 +32,14 @@ class SmartNetworkThermometer (threading.Thread) :
         fcntl.fcntl(self.serverSocket, fcntl.F_SETFL, os.O_NONBLOCK)
 
         self.deg = "K"
+
+    def encrypt_message(plaintext):
+        aes_object = AES.new(os.environ['AES_KEY'], AES.MODE_CBC, os.environ['AES_IV'])
+        return aes_object.encrypt(plaintext)
+        
+    def decrypt_message(ciphertext):
+        aes_object = AES.new(os.environ['AES_KEY'], AES.MODE_CBC, os.environ['AES_IV'])
+        return aes_object.decrypt(ciphertext)
 
     def setSource(self, source) :
         self.source = source
@@ -56,15 +67,17 @@ class SmartNetworkThermometer (threading.Thread) :
         cmds = msg.split(';')
         for c in cmds :
             cs = c.split(' ')
-            if len(cs) == 2 : #should be either AUTH or LOGOUT
+            if len(cs) == 2 : #should be either AUTH
                 if cs[0] == "AUTH":
-                    if cs[1] == "!Q#E%T&U8i6y4r2w" :
+                    if cs[1] == os.environ['PRE_SHARED_KEY'] :
                         self.tokens.append(''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16)))
                         self.serverSocket.sendto(self.tokens[-1].encode("utf-8"), addr)
                         #print (self.tokens[-1])
-                elif cs[0] == "LOGOUT":
-                    if cs[1] in self.tokens :
-                        self.tokens.remove(cs[1])
+                else : #unknown command
+                    self.serverSocket.sendto(b"Invalid Command\n", addr)
+            elif len(cs) == 3 : # Should be LOGOUT
+                if cs[0] == "LOGOUT" and cs[1] == os.environ['PRE_SHARED_KEY']:
+                    self.tokens.remove(cs[2])
                 else : #unknown command
                     self.serverSocket.sendto(b"Invalid Command\n", addr)
             elif c == "SET_DEGF" :
@@ -98,8 +111,13 @@ class SmartNetworkThermometer (threading.Thread) :
                     else :
                             self.serverSocket.sendto(b"Bad Command\n", addr)
                 elif len(cmds) == 2 :
-                    if cmds[0] in self.open_cmds : #if its AUTH or LOGOUT
+                    if cmds[0] == 'AUTH' : #if its AUTH
                         self.processCommands(msg, addr) 
+                    else :
+                        self.serverSocket.sendto(b"Authenticate First\n", addr)
+                elif len(cmds) == 3 :
+                    if cmds[0] == 'LOGOUT' :
+                        self.processCommands(msg, addr)
                     else :
                         self.serverSocket.sendto(b"Authenticate First\n", addr)
                 else :
@@ -140,6 +158,14 @@ class SimpleClient :
         self.ani = animation.FuncAnimation(self.fig, self.updateInfTemp, interval=500)
         self.ani2 = animation.FuncAnimation(self.fig, self.updateIncTemp, interval=500)
 
+    def encrypt_message(plaintext):
+        aes_object = AES.new(os.environ['AES_KEY'], AES.MODE_CBC, os.environ['AES_IV'])
+        return aes_object.encrypt(plaintext)
+        
+    def decrypt_message(ciphertext):
+        aes_object = AES.new(os.environ['AES_KEY'], AES.MODE_CBC, os.environ['AES_IV'])
+        return aes_object.decrypt(ciphertext)
+
     def updateTime(self) :
         now = time.time()
         if math.floor(now) > math.floor(self.lastTime) :
@@ -151,18 +177,31 @@ class SimpleClient :
             plt.xticks(range(30), self.times,rotation = 45)
             plt.title(time.strftime("%A, %Y-%m-%d", time.localtime(now)))
 
+    def processInfTemp(self):
+        if self.infTherm.deg == 'C':
+            return self.infTherm.getTemperature()
+        if self.infTherm.deg == 'F':
+            return (self.infTherm.getTemperature() - 32) / 1.800
+        return self.infTherm.getTemperature() - 273
 
     def updateInfTemp(self, frame) :
         self.updateTime()
-        self.infTemps.append(self.infTherm.getTemperature()-273)
+        self.infTemps.append(self.processInfTemp())
         #self.infTemps.append(self.infTemps[-1] + 1)
         self.infTemps = self.infTemps[-30:]
         self.infLn.set_data(range(30), self.infTemps)
         return self.infLn,
 
+    def processIncTemp(self):
+        if self.incTherm.deg == 'C':
+            return self.incTherm.getTemperature()
+        if self.incTherm.deg == 'F':
+            return (self.incTherm.getTemperature() - 32) / 1.800
+        return self.incTherm.getTemperature() - 273
+
     def updateIncTemp(self, frame) :
         self.updateTime()
-        self.incTemps.append(self.incTherm.getTemperature()-273)
+        self.incTemps.append(self.processIncTemp())
         #self.incTemps.append(self.incTemps[-1] + 1)
         self.incTemps = self.incTemps[-30:]
         self.incLn.set_data(range(30), self.incTemps)
