@@ -16,7 +16,7 @@ def authenticate(port, password):
 def testcase1():
     """
     Vulnerabilty 1 is incorrect display of informaiton on client side
-    using simple client in SampleNetworkClient.py
+    using simple client in SampleNetworkServer.py
     1) Testcase will authentication to receive a token.
     2) Testcase will SET_DEGF on infant port.
     3) Testcase will SET_DEGC on incubator port.

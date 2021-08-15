@@ -5,6 +5,8 @@ Please make sure you export the necessary variables/secrets to run the client as
 
 - PRE_SHARED_KEY = [AUTH CREDENTIALS]
 
+Make sure that both SampleNetworkServer.py and SampleNetworkClient.py are running for Testcases 1 and 2
+
 ## 1 - Simple Client does not reflect appropriate values when server switches self.deg to either celsius or fahrenheit
 
 ### Description
@@ -41,7 +43,7 @@ def updateInfTemp(self, frame) :
 Initial start up of network server and network client will result in display of temperatures on graph based on celsius values despite server side values being stored as Kelvin. This indicates some transformation occurs on client side to make the graph display appropriately. However, upon execution of SET_DEGF or SET_DEGC, the temperature on the graph will plummet below 20. This is a bug in the code that will result in the output of incorrect informatino to users - an effect of data integrity loss. This is due to the SimpleNetworkClient Object within SampleClientServer.py interpreting all data as Kelvin
 
 ### Test
-See testcase2() in testccases.py
+See testcase2() in testcases.py
 
 ### Patch
 There are 3 parts to succesfully patch this bug:
