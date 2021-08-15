@@ -14,9 +14,6 @@ import string
 # Added libraries for encryption / decryption functions
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
-os.environ["AES_KEY"] = "A"*32
-os.environ["AES_IV"] = "A"*16
-os.environ["PRE_SHARED_KEY"] = "A"
 
 class SmartNetworkThermometer (threading.Thread) :
     open_cmds = ["AUTH", "LOGOUT"]
@@ -42,7 +39,6 @@ class SmartNetworkThermometer (threading.Thread) :
     def enc_recvfrom(self, num_bytes):
         aes_object = AES.new(os.environ['AES_KEY'].encode(), AES.MODE_CBC, os.environ['AES_IV'].encode())
         msg, addr = self.serverSocket.recvfrom(num_bytes)
-        print(msg)
         msg = unpad(aes_object.decrypt(msg), self.block_size)
         return msg, addr
     
