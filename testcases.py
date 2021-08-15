@@ -15,27 +15,7 @@ def authenticate(port, password):
 
 def testcase1():
     """
-    Vulnerability 1 and 4 are authentication token and authentication
-    credentials sent in plaintext.
-    1) Open wireshark and listen on localhost to check for plaintext auth token
-    2) Testcase will authenticate to receive a token
-    """
-    try:
-        
-        inf_port = 23456
-        inc_port = 23457
-        inc_token = authenticate(inc_port, b"!Q#E%T&U8i6y4r2w")[1]
-
-        # SampleNetworkServer has authentication so the testcase will exit at this assertion.
-        assert(inc_token != None)
-    except Exception as ex:
-        print (ex)
-        assert(1 == 2)
-
-
-def testcase2():
-    """
-    Vulnerabilty 2 is incorrect display of informaiton on client side
+    Vulnerabilty 1 is incorrect display of informaiton on client side
     using simple client in SampleNetworkClient.py
     1) Testcase will authentication to receive a token.
     2) Testcase will SET_DEGF on infant port.
@@ -59,6 +39,33 @@ def testcase2():
         print (ex)
         assert(1 == 2)
 
+
+def testcase2():
+    """
+    Vulnerabilty 2 is incorrect display of informaiton on client side
+    using the client defined in SampleNetworkClient.py
+    1) Make sure SampleNetworkClient.py is running alongside SampleNetworkClient.py
+    1) Testcase will authentication to receive a token.
+    2) Testcase will SET_DEGF on infant port.
+    3) Testcase will SET_DEGC on incubator port.
+    4) View Plot as temperatures for both will plummet below the 20 axis.
+    """
+    try:
+        inf_port = 23456
+        (inf_socket, inf_token) = authenticate(inf_port, b"!Q#E%T&U8i6y4r2w")
+        
+        # SET_DEGF on infant port
+        inf_socket.sendto(b"%s;SET_DEGF" % inf_token, ("127.0.0.1", inf_port))
+        
+        sleep(5)
+
+        # SET_DEGC on incubator port
+        inf_socket.sendto(b"%s;SET_DEGC" % inf_token, ("127.0.0.1", inf_port))
+
+        assert(inf_token != None)
+    except Exception as ex:
+        print (ex)
+        assert(1 == 2)
 
 
 def testcase3():
@@ -90,7 +97,7 @@ def testcase3():
 
 def testcase4():
     """
-    Vulnerability 5 is hardcoded credentials in the server code
+    Vulnerability 4 is hardcoded credentials in the server code
     1) Testcase will open file SampleNetworkServer.py
     2) Testcase will then read line by line to check for the hardcoded password
     """
@@ -105,7 +112,7 @@ def testcase4():
 
 def testcase5():
     """
-    Vulnerability 6 is hardcoded credentials in the client code
+    Vulnerability 5 is hardcoded credentials in the client code
     1) Testcase will open file SampleNetworkClient.py
     2) Testcase will then read line by line to check for the hardcoded password
     """
@@ -117,30 +124,21 @@ def testcase5():
         print (ex)
         assert(1 == 2)
 
-
 def testcase6():
     """
-    Vulnerabilty 7 is incorrect display of informaiton on client side
-    using the client defined in SampleNetworkClient.py
-    1) Make sure SampleNetworkClient.py is running alongside SampleNetworkClient.py
-    1) Testcase will authentication to receive a token.
-    2) Testcase will SET_DEGF on infant port.
-    3) Testcase will SET_DEGC on incubator port.
-    4) View Plot as temperatures for both will plummet below the 20 axis.
+    Vulnerability 6 and 7 are authentication token and authentication
+    credentials sent in plaintext.
+    1) Open wireshark and listen on localhost to check for plaintext auth token
+    2) Testcase will authenticate to receive a token
     """
     try:
+        
         inf_port = 23456
-        (inf_socket, inf_token) = authenticate(inf_port, b"!Q#E%T&U8i6y4r2w")
-        
-        # SET_DEGF on infant port
-        inf_socket.sendto(b"%s;SET_DEGF" % inf_token, ("127.0.0.1", inf_port))
-        
-        sleep(5)
+        inc_port = 23457
+        inc_token = authenticate(inc_port, b"!Q#E%T&U8i6y4r2w")[1]
 
-        # SET_DEGC on incubator port
-        inf_socket.sendto(b"%s;SET_DEGC" % inf_token, ("127.0.0.1", inf_port))
-
-        assert(inf_token != None)
+        # SampleNetworkServer has authentication so the testcase will exit at this assertion.
+        assert(inc_token != None)
     except Exception as ex:
         print (ex)
         assert(1 == 2)
