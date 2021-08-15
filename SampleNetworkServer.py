@@ -57,10 +57,12 @@ class SmartNetworkThermometer (threading.Thread) :
 
     def getTemperature(self) :
         if self.deg == "C" :
+            print('GET TEMP: C')
             return self.curTemperature - 273
         if self.deg == "F" :
+            print('GET TEMP: F')
             return (self.curTemperature - 273) * 9 / 5 + 32
-
+        print('GET TEMP: K')
         return self.curTemperature
 
     def processCommands(self, msg, addr) :
@@ -87,7 +89,7 @@ class SmartNetworkThermometer (threading.Thread) :
             elif c == "SET_DEGK" :
                 self.deg = "K"
             elif c == "GET_TEMP" :
-                self.serverSocket.sendto(b"%f\n" % self.getTemperature(), addr)
+                self.serverSocket.sendto(b"%f %s\n" % (self.getTemperature(), self.deg.encode()), addr)
             elif c == "UPDATE_TEMP" :
                 self.updateTemperature()
             elif c :
@@ -179,8 +181,10 @@ class SimpleClient :
 
     def processInfTemp(self):
         if self.infTherm.deg == 'C':
+            print(self.infTherm.getTemperature())
             return self.infTherm.getTemperature()
         if self.infTherm.deg == 'F':
+            print(self.infTherm.getTemperature())
             return (self.infTherm.getTemperature() - 32) / 1.800
         return self.infTherm.getTemperature() - 273
 
@@ -192,16 +196,9 @@ class SimpleClient :
         self.infLn.set_data(range(30), self.infTemps)
         return self.infLn,
 
-    def processIncTemp(self):
-        if self.incTherm.deg == 'C':
-            return self.incTherm.getTemperature()
-        if self.incTherm.deg == 'F':
-            return (self.incTherm.getTemperature() - 32) / 1.800
-        return self.incTherm.getTemperature() - 273
-
     def updateIncTemp(self, frame) :
         self.updateTime()
-        self.incTemps.append(self.processIncTemp())
+        self.incTemps.append(self.incTherm.getTemperature() - 273)
         #self.incTemps.append(self.incTemps[-1] + 1)
         self.incTemps = self.incTemps[-30:]
         self.incLn.set_data(range(30), self.incTemps)
