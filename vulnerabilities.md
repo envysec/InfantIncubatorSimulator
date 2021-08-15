@@ -7,7 +7,7 @@ Please make sure you export the necessary variables/secrets to run the client as
 - AES_KEY = [32 BYTE KEY]
 - AES_IV = [16 BYTE IV]
 
-Make sure that both SampleNetworkServer.py and SampleNetworkClient.py are running for Testcases 1 and 2
+Make sure that both SampleNetworkServer.py and SampleNetworkClient.py are running for Testcases 1, 2, and 6
 
 ## 1 - Simple Client does not reflect appropriate values when server switches self.deg to either celsius or fahrenheit
 
