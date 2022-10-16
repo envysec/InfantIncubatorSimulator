@@ -4,8 +4,10 @@
 Please make sure you export the necessary variables/secrets to run the client as hard coded secrets have been removed for security purposes. In this case you want to set the value variables:
 
 - PRE_SHARED_KEY = [AUTH CREDENTIALS]
+- AES_KEY = [32 BYTE KEY]
+- AES_IV = [16 BYTE IV]
 
-Make sure that both SampleNetworkServer.py and SampleNetworkClient.py are running for Testcases 1 and 2
+Make sure that both SampleNetworkServer.py and SampleNetworkClient.py are running for Testcases 1, 2, and 6
 
 ## 1 - Simple Client does not reflect appropriate values when server switches self.deg to either celsius or fahrenheit
 
@@ -97,7 +99,7 @@ Clients are able to delete authorization tokens using the command ```LOGOUT [AUT
 ### Test
 See testcase3() in testcases.py
 
-### Remediation
+### Patch
 Require the client to authenticate and provide the Preshared Key when logging out. There needs to be an adjustment on how the Logout command is processed (the processCommands() method) and how it is parsed (the run() method). See code snippets below.
 
 ```
@@ -214,4 +216,90 @@ def updateInfTemp(self, frame) :
         self.incTemps = self.incTemps[-30:]
         self.incLn.set_data(range(30), self.incTemps)
         return self.incLn,
+```
+
+## 6 - Client Sends Password and Token as Plaintext Over Unencrypted Channel
+
+### Description
+Passwords and other login credentials should not be sent in plaintext over the network. This exposes the user to complete account compromise if any packet containing sensistive login information is sniffed by an adversary.
+
+### Test
+See testcase6() in testcases.py
+
+### Patch
+Credentials should only be sent over encrypted channels to prevent anyone other than the intended recipient from reading them. To facilitate this, the SampleNetworkClient has been patched so that all communications with the server use AES. See code snippet below.
+```
+    def enc_recvfrom(self, num_bytes):
+        aes_object = AES.new(os.environ['AES_KEY'].encode(), AES.MODE_CBC, os.environ['AES_IV'].encode())
+        msg, addr = self.serverSocket.recvfrom(num_bytes)
+        msg = unpad(aes_object.decrypt(msg), self.block_size)
+        return msg, addr
+```
+```
+    def enc_sendto(self, msg, addr):
+        aes_object = AES.new(os.environ['AES_KEY'].encode(), AES.MODE_CBC, os.environ['AES_IV'].encode())
+        msg = aes_object.encrypt(pad(msg, self.block_size))
+        return self.serverSocket.sendto(msg, addr)
+```
+```
+    def authenticate(self, p, pw) :
+        s = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        self.enc_sendto(s, b"AUTH %s" % pw, ("127.0.0.1", p))
+        msg, addr = self.enc_recvfrom(s, 1024)
+        return msg.strip()
+```
+
+## 7 - Server Sends Token as Plaintext Over Unencrypted Channel
+
+### Description
+Passwords and other login credentials should not be sent in plaintext over the network. This exposes the user to complete account compromise if any packet containing sensistive login information is sniffed by an adversary.
+
+### Test
+See testcase6() in testcases.py
+
+### Patch
+Credentials should only be sent over encrypted channels to prevent anyone other than the intended recipient from reading them. To facilitate this, the SampleNetworkServer has been patched so that all communications with the client use AES. See code snippet below.
+```
+    def enc_recvfrom(self, num_bytes):
+        aes_object = AES.new(os.environ['AES_KEY'].encode(), AES.MODE_CBC, os.environ['AES_IV'].encode())
+        msg, addr = self.serverSocket.recvfrom(num_bytes)
+        msg = unpad(aes_object.decrypt(msg), self.block_size)
+        return msg, addr
+```
+```
+    def enc_sendto(self, msg, addr):
+        aes_object = AES.new(os.environ['AES_KEY'].encode(), AES.MODE_CBC, os.environ['AES_IV'].encode())
+        msg = aes_object.encrypt(pad(msg, self.block_size))
+        return self.serverSocket.sendto(msg, addr)
+```
+```
+    def processCommands(self, msg, addr) :
+        cmds = msg.split(';')
+        for c in cmds :
+            cs = c.split(' ')
+            if len(cs) == 2 : #should be either AUTH
+                if cs[0] == "AUTH":
+                    if cs[1] == os.environ['PRE_SHARED_KEY'] :
+                        self.tokens.append(''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16)))
+                        self.enc_sendto(self.tokens[-1].encode("utf-8"), addr)
+                        #print (self.tokens[-1])
+                else : #unknown command
+                    self.enc_sendto(b"Invalid Command\n", addr)
+            elif len(cs) == 3 : # Should be LOGOUT
+                if cs[0] == "LOGOUT" and cs[1] == os.environ['PRE_SHARED_KEY']:
+                    self.tokens.remove(cs[2])
+                else : #unknown command
+                    self.enc_sendto(b"Invalid Command\n", addr)
+            elif c == "SET_DEGF" :
+                self.deg = "F"
+            elif c == "SET_DEGC" :
+                self.deg = "C"
+            elif c == "SET_DEGK" :
+                self.deg = "K"
+            elif c == "GET_TEMP" :
+                self.enc_sendto(b"%f %s\n" % (self.getTemperature(), self.deg.encode()), addr)
+            elif c == "UPDATE_TEMP" :
+                self.updateTemperature()
+            elif c :
+                self.enc_sendto(b"Invalid Command\n", addr)
 ```

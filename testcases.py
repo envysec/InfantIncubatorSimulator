@@ -44,7 +44,7 @@ def testcase2():
     """
     Vulnerabilty 2 is incorrect display of informaiton on client side
     using the client defined in SampleNetworkClient.py
-    1) Make sure SampleNetworkClient.py is running alongside SampleNetworkClient.py
+    1) Make sure SampleNetworkServer.py is running alongside SampleNetworkClient.py
     1) Testcase will authentication to receive a token.
     2) Testcase will SET_DEGF on infant port.
     3) Testcase will SET_DEGC on incubator port.

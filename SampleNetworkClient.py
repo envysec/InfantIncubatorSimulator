@@ -5,6 +5,10 @@ import math
 import socket
 import os
 
+# Added libraries for encryption / decryption functions
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+
 class SimpleNetworkClient :
     def __init__(self, port1, port2) :
         self.fig, self.ax = plt.subplots()
@@ -27,6 +31,19 @@ class SimpleNetworkClient :
         self.ani = animation.FuncAnimation(self.fig, self.updateInfTemp, interval=500)
         self.ani2 = animation.FuncAnimation(self.fig, self.updateIncTemp, interval=500)
 
+        self.block_size = len(os.environ['AES_IV'])
+
+    def enc_recvfrom(self, s, num_bytes):
+        aes_object = AES.new(os.environ['AES_KEY'].encode(), AES.MODE_CBC, os.environ['AES_IV'].encode())
+        msg, addr = s.recvfrom(num_bytes)
+        msg = unpad(aes_object.decrypt(msg), self.block_size)
+        return msg, addr
+    
+    def enc_sendto(self, s, msg, addr):
+        aes_object = AES.new(os.environ['AES_KEY'].encode(), AES.MODE_CBC, os.environ['AES_IV'].encode())
+        msg = aes_object.encrypt(pad(msg, self.block_size))
+        return s.sendto(msg, addr)
+
     def updateTime(self) :
         now = time.time()
         if math.floor(now) > math.floor(self.lastTime) :
@@ -40,8 +57,8 @@ class SimpleNetworkClient :
 
     def getTemperatureFromPort(self, p, tok) :
         s = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-        s.sendto(b"%s;GET_TEMP" % tok, ("127.0.0.1", p))
-        msg, addr = s.recvfrom(1024)
+        self.enc_sendto(s, b"%s;GET_TEMP" % tok, ("127.0.0.1", p))
+        msg, addr = self.enc_recvfrom(s, 1024)
         m = msg.decode("utf-8")
         m = m.split(' ')
         temperature = float(m[0].strip())
@@ -50,8 +67,8 @@ class SimpleNetworkClient :
 
     def authenticate(self, p, pw) :
         s = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-        s.sendto(b"AUTH %s" % pw, ("127.0.0.1", p))
-        msg, addr = s.recvfrom(1024)
+        self.enc_sendto(s, b"AUTH %s" % pw, ("127.0.0.1", p))
+        msg, addr = self.enc_recvfrom(s, 1024)
         return msg.strip()
 
     def processInfTemp(self):

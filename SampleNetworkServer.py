@@ -11,8 +11,9 @@ import errno
 import random
 import string
 
-# Added libraries
+# Added libraries for encryption / decryption functions
 from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
 
 class SmartNetworkThermometer (threading.Thread) :
     open_cmds = ["AUTH", "LOGOUT"]
@@ -33,13 +34,18 @@ class SmartNetworkThermometer (threading.Thread) :
 
         self.deg = "K"
 
-    def encrypt_message(plaintext):
-        aes_object = AES.new(os.environ['AES_KEY'], AES.MODE_CBC, os.environ['AES_IV'])
-        return aes_object.encrypt(plaintext)
-        
-    def decrypt_message(ciphertext):
-        aes_object = AES.new(os.environ['AES_KEY'], AES.MODE_CBC, os.environ['AES_IV'])
-        return aes_object.decrypt(ciphertext)
+        self.block_size = 16
+    
+    def enc_recvfrom(self, num_bytes):
+        aes_object = AES.new(os.environ['AES_KEY'].encode(), AES.MODE_CBC, os.environ['AES_IV'].encode())
+        msg, addr = self.serverSocket.recvfrom(num_bytes)
+        msg = unpad(aes_object.decrypt(msg), self.block_size)
+        return msg, addr
+    
+    def enc_sendto(self, msg, addr):
+        aes_object = AES.new(os.environ['AES_KEY'].encode(), AES.MODE_CBC, os.environ['AES_IV'].encode())
+        msg = aes_object.encrypt(pad(msg, self.block_size))
+        return self.serverSocket.sendto(msg, addr)
 
     def setSource(self, source) :
         self.source = source
@@ -73,15 +79,15 @@ class SmartNetworkThermometer (threading.Thread) :
                 if cs[0] == "AUTH":
                     if cs[1] == os.environ['PRE_SHARED_KEY'] :
                         self.tokens.append(''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16)))
-                        self.serverSocket.sendto(self.tokens[-1].encode("utf-8"), addr)
+                        self.enc_sendto(self.tokens[-1].encode("utf-8"), addr)
                         #print (self.tokens[-1])
                 else : #unknown command
-                    self.serverSocket.sendto(b"Invalid Command\n", addr)
+                    self.enc_sendto(b"Invalid Command\n", addr)
             elif len(cs) == 3 : # Should be LOGOUT
                 if cs[0] == "LOGOUT" and cs[1] == os.environ['PRE_SHARED_KEY']:
                     self.tokens.remove(cs[2])
                 else : #unknown command
-                    self.serverSocket.sendto(b"Invalid Command\n", addr)
+                    self.enc_sendto(b"Invalid Command\n", addr)
             elif c == "SET_DEGF" :
                 self.deg = "F"
             elif c == "SET_DEGC" :
@@ -89,17 +95,17 @@ class SmartNetworkThermometer (threading.Thread) :
             elif c == "SET_DEGK" :
                 self.deg = "K"
             elif c == "GET_TEMP" :
-                self.serverSocket.sendto(b"%f %s\n" % (self.getTemperature(), self.deg.encode()), addr)
+                self.enc_sendto(b"%f %s\n" % (self.getTemperature(), self.deg.encode()), addr)
             elif c == "UPDATE_TEMP" :
                 self.updateTemperature()
             elif c :
-                self.serverSocket.sendto(b"Invalid Command\n", addr)
+                self.enc_sendto(b"Invalid Command\n", addr)
 
 
     def run(self) : #the running function
         while True : 
             try :
-                msg, addr = self.serverSocket.recvfrom(1024)
+                msg, addr = self.enc_recvfrom(1024)
                 msg = msg.decode("utf-8").strip()
                 cmds = msg.split(' ')
                 if len(cmds) == 1 : # protected commands case
@@ -109,22 +115,22 @@ class SmartNetworkThermometer (threading.Thread) :
                         if msg[:semi] in self.tokens : #if its a valid token
                             self.processCommands(msg[semi+1:], addr)
                         else :
-                            self.serverSocket.sendto(b"Bad Token\n", addr)
+                            self.enc_sendto(b"Bad Token\n", addr)
                     else :
-                            self.serverSocket.sendto(b"Bad Command\n", addr)
+                            self.enc_sendto(b"Bad Command\n", addr)
                 elif len(cmds) == 2 :
                     if cmds[0] == 'AUTH' : #if its AUTH
                         self.processCommands(msg, addr) 
                     else :
-                        self.serverSocket.sendto(b"Authenticate First\n", addr)
+                        self.enc_sendto(b"Authenticate First\n", addr)
                 elif len(cmds) == 3 :
                     if cmds[0] == 'LOGOUT' :
                         self.processCommands(msg, addr)
                     else :
-                        self.serverSocket.sendto(b"Authenticate First\n", addr)
+                        self.enc_sendto(b"Authenticate First\n", addr)
                 else :
                     # otherwise bad command
-                    self.serverSocket.sendto(b"Bad Command\n", addr)
+                    self.enc_sendto(b"Bad Command\n", addr)
     
             except IOError as e :
                 if e.errno == errno.EWOULDBLOCK :
@@ -159,14 +165,6 @@ class SimpleClient :
 
         self.ani = animation.FuncAnimation(self.fig, self.updateInfTemp, interval=500)
         self.ani2 = animation.FuncAnimation(self.fig, self.updateIncTemp, interval=500)
-
-    def encrypt_message(plaintext):
-        aes_object = AES.new(os.environ['AES_KEY'], AES.MODE_CBC, os.environ['AES_IV'])
-        return aes_object.encrypt(plaintext)
-        
-    def decrypt_message(ciphertext):
-        aes_object = AES.new(os.environ['AES_KEY'], AES.MODE_CBC, os.environ['AES_IV'])
-        return aes_object.decrypt(ciphertext)
 
     def updateTime(self) :
         now = time.time()
